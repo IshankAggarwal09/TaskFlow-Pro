@@ -49,13 +49,22 @@ async function validateAndAddDependency(predecessorId, successorId) {
   }
 
   // 5. If all checks pass, insert the new edge
-  const insertRes = await pool.query(
-    'INSERT INTO task_dependencies (predecessor_id, successor_id, ai_suggested) VALUES ($1, $2, false) RETURNING *',
-    [predecessorId, successorId]
-  );
+  let insertRes;
+  try {
+    insertRes = await pool.query(
+      'INSERT INTO task_dependencies (predecessor_id, successor_id, ai_suggested) VALUES ($1, $2, false) RETURNING *',
+      [predecessorId, successorId]
+    );
+  } catch (err) {
+    throw err;
+  }
 
   // 6. call recomputeStatus(successorId)
-  await recomputeStatus(successorId);
+  try {
+    await recomputeStatus(successorId);
+  } catch (err) {
+    console.error('recomputeStatus failed after dependency insert:', err);
+  }
 
   // 7. Return the newly created dependency row.
   return insertRes.rows[0];
@@ -64,6 +73,9 @@ async function validateAndAddDependency(predecessorId, successorId) {
 async function recomputeStatus(taskId, visited = new Set()) {
   if (visited.has(taskId)) return;
   visited.add(taskId);
+  
+  const taskCheck = await pool.query('SELECT 1 FROM tasks WHERE id = $1', [taskId]);
+  if (taskCheck.rows.length === 0) return;
 
   // Fetch all predecessor task IDs for this task
   const predsRes = await pool.query(
@@ -98,6 +110,11 @@ async function recomputeStatus(taskId, visited = new Set()) {
 }
 
 async function propagateSchedule(taskId, newEndDate) {
+  if (newEndDate == null) {
+    console.warn('propagateSchedule skipped: newEndDate is null or undefined');
+    return;
+  }
+
   // 1. Build the full downstream subgraph starting from taskId.
   const edgesRes = await pool.query('SELECT predecessor_id, successor_id FROM task_dependencies');
   const allEdges = edgesRes.rows;

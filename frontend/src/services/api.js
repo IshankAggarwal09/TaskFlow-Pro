@@ -4,6 +4,22 @@ const api = axios.create({
   baseURL: 'http://localhost:3001/api'
 });
 
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response) {
+      if (error.response.status === 400) {
+        throw new Error(error.response.data?.error || 'Bad Request');
+      } else if (error.response.status >= 500) {
+        throw new Error('Server error, please try again');
+      }
+    } else if (error.request) {
+      throw new Error('Cannot connect to server');
+    }
+    throw error;
+  }
+);
+
 export const getBoard = async () => {
   const response = await api.get('/board');
   return response.data;

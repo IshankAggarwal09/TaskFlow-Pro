@@ -25,6 +25,7 @@ const COLUMNS = [
 
 const KanbanBoard = ({ tasks, dependencies, onTaskUpdate, onTaskDelete, onDependencyAdd, onDependencyRemove, criticalPath }) => {
   const [activeId, setActiveId] = useState(null);
+  const [toastMessage, setToastMessage] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -64,6 +65,8 @@ const KanbanBoard = ({ tasks, dependencies, onTaskUpdate, onTaskDelete, onDepend
         if (onTaskUpdate) onTaskUpdate();
       } catch (err) {
         console.error('Failed to update task position', err);
+        setToastMessage('Move failed, please try again');
+        setTimeout(() => setToastMessage(''), 3000);
       }
     }
   };
@@ -81,6 +84,11 @@ const KanbanBoard = ({ tasks, dependencies, onTaskUpdate, onTaskDelete, onDepend
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50">
+          {toastMessage}
+        </div>
+      )}
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
         {COLUMNS.map(col => {
           const columnTasks = getTasksByColumn(col.id);

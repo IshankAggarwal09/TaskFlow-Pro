@@ -1,85 +1,27 @@
 # TaskFlow Pro
 
-A dependency-aware Kanban board powered by a DAG scheduling engine with AI-assisted dependency suggestions
-
----
-
-## Tech Stack
-
-| Layer      | Technology                        |
-|------------|-----------------------------------|
-| Frontend   | React (Vite), TailwindCSS, Axios  |
-| Backend    | Node.js, Express                  |
-| Database   | PostgreSQL                        |
-| AI         | Anthropic Claude API              |
-| Package Mgr| npm                               |
-
----
+A dependency-aware Kanban board powered by a DAG scheduling engine.
 
 ## Setup Instructions
 
 ### Prerequisites
-- Node.js >= 18.x
-- PostgreSQL >= 14.x
-- npm >= 9.x
+- Node.js 18+
+- PostgreSQL 14+
 
-### 1. Clone & Install Dependencies
+### Backend Setup
+1. `cd backend`
+2. `npm install`
+3. `cp .env.example .env`
+4. Fill in `DATABASE_URL` with your PostgreSQL connection string
+5. Fill in `ANTHROPIC_API_KEY` with your Anthropic API key
+6. `npm run dev`
 
-```bash
-# Install backend dependencies
-cd backend
-npm install
+### Frontend Setup
+1. `cd frontend`
+2. `npm install`
+3. `npm run dev`
 
-# Install frontend dependencies
-cd ../frontend
-npm install
-```
+### Running Tests
+`cd backend && npm test`
 
-### 2. Configure Environment
-
-```bash
-# Copy the example env file in backend/
-cp backend/.env.example backend/.env
-
-# Edit backend/.env with your values:
-# DATABASE_URL=postgresql://<user>:<password>@localhost:5432/taskflow
-# ANTHROPIC_API_KEY=<your_key>
-# PORT=3001
-```
-
-### 3. Create the Database
-
-```bash
-psql -U postgres -c "CREATE DATABASE taskflow;"
-```
-
-### 4. Run the Backend
-
-```bash
-cd backend
-npm run dev
-# Migrations and seed data run automatically on first start
-```
-
-### 5. Run the Frontend
-
-```bash
-cd frontend
-npm run dev
-# Open http://localhost:5173
-```
-
----
-
-## Key Assumptions and Limitations
-
-- **No weekend/holiday awareness in schedule propagation** — Date calculations treat all days equally; business-day logic is not implemented.
-- **Single board, single team scope** — The application supports one global Kanban board with no workspace or project segmentation.
-- **No real-time multi-user collaboration** — Changes made by one user are not pushed to other open sessions; a page refresh is required.
-- **Authentication deferred** — There is no login or user management system in the current version; all users share the same board.
-
----
-
-## AI Tool Declaration
-
-> **Claude** (claude.ai) was used for boilerplate generation, code review, and prompt iteration. All DAG engine logic was written and reviewed by the developer.
+The app seeds 10 realistic tasks with dependencies automatically on first run. The board will be pre-populated when you open http://localhost:5173.

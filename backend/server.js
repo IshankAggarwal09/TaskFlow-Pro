@@ -74,4 +74,8 @@ async function initialize() {
   }
 }
 
-initialize();
+if (require.main === module) {
+  initialize();
+}
+
+module.exports = app;
