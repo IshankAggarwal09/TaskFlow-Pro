@@ -1,6 +1,24 @@
 # TaskFlow Pro
+A dependency-aware Kanban board powered by a DAG scheduling engine with AI-assisted dependency suggestions.
 
-A dependency-aware Kanban board powered by a DAG scheduling engine.
+## Live Demo
+[Add your Vercel URL here after deployment]
+
+## Features
+- Four-column Kanban board (Backlog, In Progress, Review, Done)
+- DAG-based dependency engine with cycle detection
+- Automatic schedule propagation using topological sort (no double-counting on diamond paths)
+- Rollback re-blocking when completed tasks regress
+- AI-powered dependency suggestions via Claude API with human-in-the-loop validation
+- Critical Path highlighting
+- Persistent state via PostgreSQL
+
+## Tech Stack
+Frontend: React (Vite), TailwindCSS, dnd-kit, Axios
+Backend: Node.js, Express
+Database: PostgreSQL
+AI: Anthropic Claude API (claude-sonnet-4-6)
+Deployment: Vercel (frontend), Railway (backend + database)
 
 ## Setup Instructions
 
@@ -9,19 +27,39 @@ A dependency-aware Kanban board powered by a DAG scheduling engine.
 - PostgreSQL 14+
 
 ### Backend Setup
-1. `cd backend`
-2. `npm install`
-3. `cp .env.example .env`
-4. Fill in `DATABASE_URL` with your PostgreSQL connection string
-5. Fill in `ANTHROPIC_API_KEY` with your Anthropic API key
-6. `npm run dev`
+1. cd backend
+2. npm install
+3. cp .env.example .env
+4. Fill in DATABASE_URL with your PostgreSQL connection string
+5. Fill in ANTHROPIC_API_KEY with your Anthropic API key
+6. npm run dev
 
 ### Frontend Setup
-1. `cd frontend`
-2. `npm install`
-3. `npm run dev`
+1. cd frontend
+2. npm install
+3. npm run dev
 
 ### Running Tests
-`cd backend && npm test`
+cd backend && npm test
 
 The app seeds 10 realistic tasks with dependencies automatically on first run. The board will be pre-populated when you open http://localhost:5173.
+
+## Architecture
+The DAG engine is the core of this application. It lives in backend/src/services/dagEngine.js and exposes four functions:
+- validateAndAddDependency: adds edges after cycle detection via DFS
+- recomputeStatus: marks tasks Ready or Blocked based on predecessor states
+- propagateSchedule: updates downstream dates using Kahn topological sort to prevent double-counting
+- recomputeOnRollback: re-blocks downstream tasks when a completed task regresses
+
+## Seed Data
+The app automatically seeds 10 realistic tasks representing a software project lifecycle with a rich dependency graph including diamond patterns to demonstrate correct schedule propagation.
+
+## AI Tool Declaration
+Claude (claude.ai) was used for boilerplate generation, code structure guidance, and prompt iteration during development. All DAG engine logic, graph algorithms, and core business rules were written and reviewed by the developer. Claude API (claude-sonnet-4-6) is used within the application for dependency suggestions as a product feature. AI-suggested dependencies are clearly labeled in the UI and require explicit human approval before being added to the graph.
+
+## Key Assumptions and Limitations
+- Schedule propagation assumes contiguous working days with no weekend or holiday awareness
+- Single board, single team context in the current build
+- No real-time collaborative editing for simultaneous users
+- Authentication and multi-tenancy are intentionally deferred
+- AI suggestions require a valid ANTHROPIC_API_KEY in the backend environment
