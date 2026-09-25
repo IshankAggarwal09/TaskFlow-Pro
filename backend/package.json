@@ -4,6 +4,7 @@
   "description": "Backend API for TaskFlow Pro - DAG-powered Kanban board",
   "main": "server.js",
   "scripts": {
+    "test": "jest",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
@@ -15,6 +16,8 @@
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "jest": "^30.5.2",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.3.0"
   }
 }
