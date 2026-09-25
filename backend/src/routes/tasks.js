@@ -1,128 +1,106 @@
 const express = require('express');
-const router = express.Router();
 const pool = require('../db/index');
+const dagEngine = require('../services/dagEngine');
+const router = express.Router();
 
-// GET /tasks — list all tasks
-router.get('/', async (req, res) => {
+router.post('/', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM tasks ORDER BY column_name, position, created_at'
+    const { title, description, column_name, start_date, end_date } = req.body;
+    if (!title || title.trim() === '') {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const colName = column_name || 'To Do';
+
+    const posRes = await pool.query(
+      'SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM tasks WHERE column_name = $1',
+      [colName]
     );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('GET /tasks error:', err);
-    res.status(500).json({ error: 'Failed to fetch tasks.' });
-  }
-});
+    const position = posRes.rows[0].next_pos;
 
-// GET /tasks/:id — get a single task
-router.get('/:id', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM tasks WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found.' });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('GET /tasks/:id error:', err);
-    res.status(500).json({ error: 'Failed to fetch task.' });
-  }
-});
-
-// POST /tasks — create a new task
-router.post('/', async (req, res) => {
-  const { title, description = '', status = 'Ready', column_name = 'Backlog', position = 0, start_date, end_date } = req.body;
-
-  if (!title || typeof title !== 'string' || !title.trim()) {
-    return res.status(400).json({ error: 'Title is required.' });
-  }
-
-  const validStatuses = ['Ready', 'Blocked'];
-  const validColumns = ['Backlog', 'In Progress', 'Review', 'Done'];
-  if (!validStatuses.includes(status)) return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
-  if (!validColumns.includes(column_name)) return res.status(400).json({ error: `Column must be one of: ${validColumns.join(', ')}` });
-
-  try {
-    const result = await pool.query(
-      `INSERT INTO tasks (title, description, status, column_name, position, start_date, end_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [title.trim(), description, status, column_name, position, start_date || null, end_date || null]
+    const insertRes = await pool.query(
+      `INSERT INTO tasks (title, description, column_name, status, position, start_date, end_date)
+       VALUES ($1, $2, $3, 'Ready', $4, $5, $6) RETURNING *`,
+      [title, description || null, colName, position, start_date || null, end_date || null]
     );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('POST /tasks error:', err);
-    res.status(500).json({ error: 'Failed to create task.' });
+    
+    res.status(201).json(insertRes.rows[0]);
+  } catch (error) {
+    next(error);
   }
 });
 
-// PATCH /tasks/:id — update a task's fields
-router.patch('/:id', async (req, res) => {
-  const { title, description, status, column_name, position, start_date, end_date } = req.body;
-
-  const validStatuses = ['Ready', 'Blocked'];
-  const validColumns = ['Backlog', 'In Progress', 'Review', 'Done'];
-
-  if (status && !validStatuses.includes(status)) return res.status(400).json({ error: `Status must be one of: ${validStatuses.join(', ')}` });
-  if (column_name && !validColumns.includes(column_name)) return res.status(400).json({ error: `Column must be one of: ${validColumns.join(', ')}` });
-  if (title !== undefined && (!title || !title.trim())) return res.status(400).json({ error: 'Title cannot be empty.' });
-
+router.patch('/:id', async (req, res, next) => {
   try {
-    const existing = await pool.query('SELECT * FROM tasks WHERE id = $1', [req.params.id]);
-    if (existing.rows.length === 0) return res.status(404).json({ error: 'Task not found.' });
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const taskRes = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (taskRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    const currentTask = taskRes.rows[0];
 
-    const current = existing.rows[0];
-    const result = await pool.query(
-      `UPDATE tasks
-       SET title = $1, description = $2, status = $3, column_name = $4, position = $5, start_date = $6, end_date = $7
-       WHERE id = $8
-       RETURNING *`,
-      [
-        title?.trim() ?? current.title,
-        description ?? current.description,
-        status ?? current.status,
-        column_name ?? current.column_name,
-        position ?? current.position,
-        start_date !== undefined ? (start_date || null) : current.start_date,
-        end_date !== undefined ? (end_date || null) : current.end_date,
-        req.params.id,
-      ]
+    const hasColChange = 'column_name' in updates && updates.column_name !== currentTask.column_name;
+    const hasDateChange = ('start_date' in updates && updates.start_date !== currentTask.start_date) || 
+                          ('end_date' in updates && updates.end_date !== currentTask.end_date);
+    
+    const updateFields = [];
+    const values = [];
+    let i = 1;
+    for (const [key, val] of Object.entries(updates)) {
+      if (['title', 'description', 'column_name', 'position', 'start_date', 'end_date'].includes(key)) {
+        updateFields.push(`${key} = $${i}`);
+        values.push(val);
+        i++;
+      }
+    }
+
+    if (updateFields.length === 0) {
+      return res.json(currentTask);
+    }
+    
+    values.push(id);
+    const updatedTaskRes = await pool.query(
+      `UPDATE tasks SET ${updateFields.join(', ')} WHERE id = $${i} RETURNING *`,
+      values
     );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('PATCH /tasks/:id error:', err);
-    res.status(500).json({ error: 'Failed to update task.' });
+    const updatedTask = updatedTaskRes.rows[0];
+
+    if (hasColChange) {
+      await dagEngine.recomputeStatus(id);
+      
+      if (updates.column_name === 'Done') {
+        const succs = await pool.query('SELECT successor_id FROM task_dependencies WHERE predecessor_id = $1', [id]);
+        for (const row of succs.rows) {
+          await dagEngine.recomputeStatus(row.successor_id);
+        }
+      } else if (currentTask.column_name === 'Done') {
+        await dagEngine.recomputeOnRollback(id);
+      }
+      
+      if ('end_date' in updates) {
+        await dagEngine.propagateSchedule(id, updates.end_date);
+      }
+    } else if (hasDateChange) {
+      if ('end_date' in updates) {
+        await dagEngine.propagateSchedule(id, updates.end_date);
+      }
+    }
+
+    res.json(updatedTask);
+  } catch (error) {
+    next(error);
   }
 });
 
-// PATCH /tasks/:id/move — move a task to a different column
-router.patch('/:id/move', async (req, res) => {
-  const { column_name, position = 0 } = req.body;
-  const validColumns = ['Backlog', 'In Progress', 'Review', 'Done'];
-  if (!column_name || !validColumns.includes(column_name)) {
-    return res.status(400).json({ error: `Column must be one of: ${validColumns.join(', ')}` });
-  }
-
+router.delete('/:id', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      'UPDATE tasks SET column_name = $1, position = $2 WHERE id = $3 RETURNING *',
-      [column_name, position, req.params.id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found.' });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error('PATCH /tasks/:id/move error:', err);
-    res.status(500).json({ error: 'Failed to move task.' });
-  }
-});
-
-// DELETE /tasks/:id — delete a task (cascades dependencies)
-router.delete('/:id', async (req, res) => {
-  try {
-    const result = await pool.query('DELETE FROM tasks WHERE id = $1 RETURNING id', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Task not found.' });
-    res.json({ deleted: result.rows[0].id });
-  } catch (err) {
-    console.error('DELETE /tasks/:id error:', err);
-    res.status(500).json({ error: 'Failed to delete task.' });
+    const { id } = req.params;
+    await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
   }
 });
 

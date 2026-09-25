@@ -1,88 +1,40 @@
 const express = require('express');
-const router = express.Router();
 const pool = require('../db/index');
-const dagService = require('../services/dagService');
+const dagEngine = require('../services/dagEngine');
+const router = express.Router();
 
-// GET /dependencies — list all dependency edges
-router.get('/', async (req, res) => {
+router.post('/:id/dependencies', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT td.*, 
-              p.title AS predecessor_title,
-              s.title AS successor_title
-       FROM task_dependencies td
-       JOIN tasks p ON p.id = td.predecessor_id
-       JOIN tasks s ON s.id = td.successor_id
-       ORDER BY p.title`
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('GET /dependencies error:', err);
-    res.status(500).json({ error: 'Failed to fetch dependencies.' });
+    const { id } = req.params;
+    const { predecessorId, aiSuggested } = req.body;
+
+    let dependency = await dagEngine.validateAndAddDependency(predecessorId, id);
+    
+    if (aiSuggested) {
+      const updateRes = await pool.query(
+        'UPDATE task_dependencies SET ai_suggested = true WHERE id = $1 RETURNING *',
+        [dependency.id]
+      );
+      dependency = updateRes.rows[0];
+    }
+    
+    res.status(201).json(dependency);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 
-// POST /dependencies — add a new dependency edge
-router.post('/', async (req, res) => {
-  const { predecessor_id, successor_id, ai_suggested = false } = req.body;
-
-  if (!predecessor_id || !successor_id) {
-    return res.status(400).json({ error: 'predecessor_id and successor_id are required.' });
-  }
-  if (predecessor_id === successor_id) {
-    return res.status(400).json({ error: 'A task cannot depend on itself.' });
-  }
-
+router.delete('/:id/dependencies/:depId', async (req, res, next) => {
   try {
-    // Verify both tasks exist
-    const tasksCheck = await pool.query(
-      'SELECT id FROM tasks WHERE id = ANY($1::uuid[])',
-      [[predecessor_id, successor_id]]
-    );
-    if (tasksCheck.rows.length < 2) {
-      return res.status(404).json({ error: 'One or both tasks not found.' });
+    const { id, depId } = req.params;
+    
+    const delRes = await pool.query('DELETE FROM task_dependencies WHERE id = $1 RETURNING *', [depId]);
+    if (delRes.rows.length > 0) {
+      await dagEngine.recomputeStatus(id);
     }
-
-    // Cycle detection via DAG service
-    const allDeps = (await pool.query('SELECT predecessor_id, successor_id FROM task_dependencies')).rows;
-    const wouldCreateCycle = dagService.detectsCycle(allDeps, predecessor_id, successor_id);
-    if (wouldCreateCycle) {
-      return res.status(409).json({ error: 'Adding this dependency would create a cycle in the DAG.' });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO task_dependencies (predecessor_id, successor_id, ai_suggested)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (predecessor_id, successor_id) DO NOTHING
-       RETURNING *`,
-      [predecessor_id, successor_id, ai_suggested]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(409).json({ error: 'This dependency already exists.' });
-    }
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('POST /dependencies error:', err);
-    res.status(500).json({ error: 'Failed to create dependency.' });
-  }
-});
-
-// DELETE /dependencies/:predecessorId/:successorId — remove a dependency edge
-router.delete('/:predecessorId/:successorId', async (req, res) => {
-  const { predecessorId, successorId } = req.params;
-  try {
-    const result = await pool.query(
-      'DELETE FROM task_dependencies WHERE predecessor_id = $1 AND successor_id = $2 RETURNING *',
-      [predecessorId, successorId]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Dependency not found.' });
-    }
-    res.json({ deleted: true });
-  } catch (err) {
-    console.error('DELETE /dependencies error:', err);
-    res.status(500).json({ error: 'Failed to delete dependency.' });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
   }
 });
 

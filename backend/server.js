@@ -5,8 +5,11 @@ const cors = require('cors');
 const pool = require('./src/db/index');
 const { runMigrations } = require('./src/db/migrations');
 const { seedDatabase } = require('./src/db/seed');
+
+const boardRouter = require('./src/routes/board');
 const tasksRouter = require('./src/routes/tasks');
 const dependenciesRouter = require('./src/routes/dependencies');
+const aiRouter = require('./src/routes/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,12 +18,25 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Request validation middleware
+app.use((req, res, next) => {
+  if (['POST', 'PATCH'].includes(req.method)) {
+    if (!req.is('application/json')) {
+      return res.status(400).json({ error: 'Content-Type must be application/json' });
+    }
+  }
+  next();
+});
+
 // Routes
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
-app.use('/tasks', tasksRouter);
-app.use('/dependencies', dependenciesRouter);
+
+app.use('/api', boardRouter);
+app.use('/api/tasks', tasksRouter);
+app.use('/api/tasks', dependenciesRouter);
+app.use('/api/tasks', aiRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -30,7 +46,7 @@ app.use((req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal server error.' });
+  res.status(500).json({ error: err.message || 'Internal server error.' });
 });
 
 // Graceful startup: run migrations then conditionally seed
