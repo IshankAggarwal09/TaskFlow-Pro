@@ -1,23 +1,40 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: 'http://localhost:3001/api'
 });
 
-// Tasks
-export const getTasks = () => api.get('/tasks');
-export const createTask = (data) => api.post('/tasks', data);
-export const updateTask = (id, data) => api.patch(`/tasks/${id}`, data);
-export const deleteTask = (id) => api.delete(`/tasks/${id}`);
-export const moveTask = (id, data) => api.patch(`/tasks/${id}/move`, data);
+export const getBoard = async () => {
+  const response = await api.get('/board');
+  return response.data;
+};
 
-// Dependencies
-export const getDependencies = () => api.get('/dependencies');
-export const createDependency = (data) => api.post('/dependencies', data);
-export const deleteDependency = (predecessorId, successorId) =>
-  api.delete(`/dependencies/${predecessorId}/${successorId}`);
+export const createTask = async (data) => {
+  const response = await api.post('/tasks', data);
+  return response.data;
+};
 
-export default api;
+export const updateTask = async (id, data) => {
+  const response = await api.patch(`/tasks/${id}`, data);
+  return response.data;
+};
+
+export const deleteTask = async (id) => {
+  const response = await api.delete(`/tasks/${id}`);
+  return response.data;
+};
+
+export const addDependency = async (taskId, predecessorId, aiSuggested = false) => {
+  const response = await api.post(`/tasks/${taskId}/dependencies`, { predecessorId, aiSuggested });
+  return response.data;
+};
+
+export const removeDependency = async (taskId, depId) => {
+  const response = await api.delete(`/tasks/${taskId}/dependencies/${depId}`);
+  return response.data;
+};
+
+export const getAiSuggestions = async (taskId) => {
+  const response = await api.post(`/tasks/${taskId}/ai-suggestions`);
+  return response.data;
+};
