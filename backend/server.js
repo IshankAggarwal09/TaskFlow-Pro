@@ -12,7 +12,7 @@ const dependenciesRouter = require('./src/routes/dependencies');
 const aiRouter = require('./src/routes/ai');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // Middleware
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173'];
@@ -72,8 +72,8 @@ async function initialize() {
       console.log(`Tasks table already has ${taskCount} row(s). Skipping seed.`);
     }
 
-    app.listen(PORT, () => {
-      console.log(`TaskFlow Pro backend running on http://localhost:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
     });
   } catch (err) {
     console.error('Failed to initialize server:', err);
