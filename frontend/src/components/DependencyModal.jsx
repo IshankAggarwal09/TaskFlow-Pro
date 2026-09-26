@@ -77,7 +77,7 @@ const DependencyModal = ({ task, allTasks, dependencies, onAddDependency, onRemo
       onClick={handleBackdropClick}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
-      <div className="bg-gray-800 text-white p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-gray-800 text-white p-4 sm:p-6 rounded-xl shadow-2xl w-full mx-4 sm:mx-auto sm:max-w-2xl max-h-screen overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Dependencies for: {task.title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>

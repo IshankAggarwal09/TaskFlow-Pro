@@ -55,7 +55,7 @@ const TaskCard = ({ task, dependencies, onTaskUpdate, onTaskDelete, onDependency
         className={`bg-gray-800 p-4 rounded-lg shadow-md cursor-grab active:cursor-grabbing border ${isCritical ? 'ring-2 ring-yellow-400 border-yellow-400 border-l-4' : 'border-gray-700'} hover:border-gray-500 transition-colors group relative`}
       >
         <div className="flex justify-between items-start mb-2">
-          <h3 className="font-bold text-gray-100 pr-6">{task.title}</h3>
+          <h3 className="font-bold text-gray-100 pr-6 break-words">{task.title}</h3>
           <div className="flex flex-col gap-1 items-end shrink-0">
             {task.status === 'Ready' ? (
               <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">Ready</span>
@@ -69,8 +69,7 @@ const TaskCard = ({ task, dependencies, onTaskUpdate, onTaskDelete, onDependency
           <p className="text-sm text-gray-400 line-clamp-2 mb-3">{task.description}</p>
         )}
         
-        <div className="flex flex-wrap items-center justify-between mt-4 text-xs text-gray-400 gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap gap-2 mt-2">
             {(task.start_date || task.end_date) && (
               <div className="flex items-center bg-gray-700 px-2 py-1 rounded">
                 <span>{formatDate(task.start_date) || '?'} - {formatDate(task.end_date) || '?'}</span>
@@ -83,7 +82,7 @@ const TaskCard = ({ task, dependencies, onTaskUpdate, onTaskDelete, onDependency
             )}
           </div>
           
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onPointerDown={e => e.stopPropagation()}>
+          <div className="flex flex-wrap gap-1 mt-2" onPointerDown={e => e.stopPropagation()}>
             <button 
               onClick={() => setIsEditModalOpen(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1"
@@ -104,7 +103,6 @@ const TaskCard = ({ task, dependencies, onTaskUpdate, onTaskDelete, onDependency
               &#128465;
             </button>
           </div>
-        </div>
       </div>
 
       {isEditModalOpen && (

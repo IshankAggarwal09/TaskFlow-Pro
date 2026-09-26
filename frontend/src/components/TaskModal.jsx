@@ -51,7 +51,7 @@ const TaskModal = ({ task, onSave, onClose }) => {
       onClick={handleBackdropClick}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
-      <div className="bg-gray-800 text-white p-6 rounded-xl shadow-2xl w-full max-w-lg">
+      <div className="bg-gray-800 text-white p-4 sm:p-6 rounded-xl shadow-2xl w-full mx-4 sm:mx-auto sm:max-w-lg max-h-screen overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">{task ? 'Edit Task' : 'Create Task'}</h2>
         
         {error && <div className="bg-red-500 text-white p-2 rounded mb-4 text-sm">{error}</div>}

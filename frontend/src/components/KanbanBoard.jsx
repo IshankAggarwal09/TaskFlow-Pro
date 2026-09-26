@@ -32,7 +32,7 @@ function DroppableColumn({ col, children, taskCount, isOver }) {
 
   return (
     <div
-      className="flex-shrink-0 w-80 rounded-lg flex flex-col shadow-lg border border-gray-700 transition-colors duration-150"
+      className="rounded-lg flex flex-col shadow-lg border border-gray-700 transition-colors duration-150 lg:max-h-screen lg:overflow-y-auto"
       style={{
         borderLeftColor: col.color,
         borderLeftWidth: 4,
@@ -159,7 +159,7 @@ const KanbanBoard = ({
         </div>
       )}
 
-      <div className="flex gap-6 h-full overflow-x-auto pb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
         {COLUMNS.map(col => {
           const columnTasks = getTasksByColumn(col.id);
           return (

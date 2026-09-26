@@ -160,8 +160,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden">
-      <header className="bg-gray-800 p-4 shadow-md flex justify-between items-center z-10">
-        <h1 className="text-2xl font-bold tracking-tight">TaskFlow Pro</h1>
+      <header className="bg-gray-800 p-4 shadow-md flex flex-col sm:flex-row sm:items-center justify-between z-10 gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">TaskFlow Pro</h1>
         <button 
           onClick={() => setCriticalPathView(!criticalPathView)}
           className={`px-4 py-2 rounded font-medium transition-colors ${criticalPathView ? 'bg-yellow-500 text-gray-900' : 'bg-gray-700 hover:bg-gray-600'}`}
@@ -170,7 +170,7 @@ function App() {
         </button>
       </header>
 
-      <main className="flex-1 overflow-x-auto p-6">
+      <main className="flex-1 overflow-y-auto">
         <KanbanBoard 
           tasks={tasks}
           dependencies={dependencies}
