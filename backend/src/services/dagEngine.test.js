@@ -74,7 +74,7 @@ describe('dagEngine', () => {
 
       await recomputeStatus('1');
       expect(pool.query).toHaveBeenCalledWith(
-        'UPDATE tasks SET column_name = $1 WHERE id = $2',
+        'UPDATE tasks SET status = $1 WHERE id = $2',
         ['Ready', '1']
       );
     });
@@ -90,7 +90,7 @@ describe('dagEngine', () => {
 
       await recomputeStatus('1');
       expect(pool.query).toHaveBeenCalledWith(
-        'UPDATE tasks SET column_name = $1 WHERE id = $2',
+        'UPDATE tasks SET status = $1 WHERE id = $2',
         ['Blocked', '1']
       );
     });
@@ -141,7 +141,7 @@ describe('dagEngine', () => {
 
       await recomputeOnRollback('1');
       expect(pool.query).toHaveBeenCalledWith(
-        'UPDATE tasks SET column_name = $1 WHERE id = $2',
+        'UPDATE tasks SET status = $1 WHERE id = $2',
         ['Ready', '1']
       );
     });

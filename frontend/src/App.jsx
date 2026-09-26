@@ -179,6 +179,7 @@ function App() {
           onDependencyAdd={handleDependencyAdd}
           onDependencyRemove={handleDependencyRemove}
           criticalPath={criticalPath}
+          setTasks={setTasks}
         />
       </main>
 

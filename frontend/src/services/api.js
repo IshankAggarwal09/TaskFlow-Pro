@@ -51,6 +51,6 @@ export const removeDependency = async (taskId, depId) => {
 };
 
 export const getAiSuggestions = async (taskId) => {
-  const response = await api.post(`/tasks/${taskId}/ai-suggestions`);
+  const response = await api.post(`/tasks/${taskId}/ai-suggestions`, {});
   return response.data;
 };

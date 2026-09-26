@@ -77,7 +77,7 @@ async function recomputeStatus(taskId, visited = new Set()) {
   const taskCheck = await pool.query('SELECT 1 FROM tasks WHERE id = $1', [taskId]);
   if (taskCheck.rows.length === 0) return;
 
-  // Fetch all predecessor task IDs for this task
+  // Fetch all predecessor task column positions for this task
   const predsRes = await pool.query(
     `SELECT t.column_name 
      FROM tasks t 
@@ -88,14 +88,16 @@ async function recomputeStatus(taskId, visited = new Set()) {
   
   let newStatus = 'Ready';
   if (predsRes.rows.length > 0) {
+    // Task is Blocked if any predecessor is not in the Done column
     const allDone = predsRes.rows.every(row => row.column_name === 'Done');
     if (!allDone) {
       newStatus = 'Blocked';
     }
   }
 
+  // Update the `status` field (NOT column_name)
   await pool.query(
-    'UPDATE tasks SET column_name = $1 WHERE id = $2',
+    'UPDATE tasks SET status = $1 WHERE id = $2',
     [newStatus, taskId]
   );
 

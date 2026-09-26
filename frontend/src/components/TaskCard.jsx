@@ -20,9 +20,10 @@ const TaskCard = ({ task, dependencies, onTaskUpdate, onTaskDelete, onDependency
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: transition ?? 'transform 200ms ease',
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0.4 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
   };
 
   const myDepsCount = dependencies?.filter(d => d.successor_id === task.id)?.length || 0;

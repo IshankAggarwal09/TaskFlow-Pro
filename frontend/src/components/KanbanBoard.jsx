@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  DndContext, 
-  closestCorners, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
+import {
+  DndContext,
+  rectIntersection,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
   useSensors,
-  DragOverlay
+  DragOverlay,
+  useDroppable
 } from '@dnd-kit/core';
-import { 
-  SortableContext, 
+import {
+  SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
@@ -17,115 +18,196 @@ import TaskCard from './TaskCard';
 import { updateTask } from '../services/api';
 
 const COLUMNS = [
-  { id: 'Backlog', title: 'Backlog' },
-  { id: 'In Progress', title: 'In Progress' },
-  { id: 'Review', title: 'Review' },
-  { id: 'Done', title: 'Done' }
+  { id: 'Backlog',      title: 'Backlog',      color: '#3b82f6' },
+  { id: 'In Progress',  title: 'In Progress',  color: '#eab308' },
+  { id: 'Review',       title: 'Review',       color: '#a855f7' },
+  { id: 'Done',         title: 'Done',         color: '#22c55e' },
 ];
 
-const KanbanBoard = ({ tasks, dependencies, onTaskUpdate, onTaskDelete, onDependencyAdd, onDependencyRemove, criticalPath }) => {
-  const [activeId, setActiveId] = useState(null);
+const COLUMN_IDS = new Set(COLUMNS.map(c => c.id));
+
+// ─── Droppable column wrapper ────────────────────────────────────────────────
+function DroppableColumn({ col, children, taskCount, isOver }) {
+  const { setNodeRef } = useDroppable({ id: col.id });
+
+  return (
+    <div
+      className="flex-shrink-0 w-80 rounded-lg flex flex-col shadow-lg border border-gray-700 transition-colors duration-150"
+      style={{
+        borderLeftColor: col.color,
+        borderLeftWidth: 4,
+        backgroundColor: isOver ? 'rgba(55,65,81,0.85)' : 'rgb(31,41,55)', // gray-700 tint vs gray-800
+      }}
+    >
+      {/* Column header */}
+      <div className="p-4 rounded-t-lg border-b border-gray-700 sticky top-0 z-10" style={{ backgroundColor: 'rgb(31,41,55)' }}>
+        <h2 className="font-semibold text-lg">
+          {col.title}{' '}
+          <span className="text-gray-400 text-sm ml-2">({taskCount})</span>
+        </h2>
+      </div>
+
+      {/* Droppable area */}
+      <div
+        ref={setNodeRef}
+        className="flex-1 p-4 overflow-y-auto min-h-[200px]"
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main board ──────────────────────────────────────────────────────────────
+const KanbanBoard = ({
+  tasks,
+  dependencies,
+  onTaskUpdate,
+  onTaskDelete,
+  onDependencyAdd,
+  onDependencyRemove,
+  criticalPath,
+  setTasks,
+}) => {
+  const [activeId,     setActiveId]     = useState(null);
+  const [overId,       setOverId]       = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  // ── sensors: 8px distance prevents accidental drags on button clicks ────
+  const pointerSensor  = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const keyboardSensor = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
+  const sensors        = useSensors(pointerSensor, keyboardSensor);
 
-  const handleDragStart = (event) => {
-    setActiveId(event.active.id);
+  // ── helpers ──────────────────────────────────────────────────────────────
+
+  /** Resolve which column an over.id belongs to (column id or card id). */
+  const resolveTargetColumn = (id) => {
+    if (COLUMN_IDS.has(id)) return id;
+    const overTask = tasks.find(t => t.id === id);
+    return overTask ? overTask.column_name : null;
   };
 
-  const handleDragEnd = async (event) => {
-    const { active, over } = event;
+  const getTasksByColumn = (columnId) =>
+    tasks.filter(t => t.column_name === columnId).sort((a, b) => a.position - b.position);
+
+  // ── drag handlers ─────────────────────────────────────────────────────────
+
+  const handleDragStart = ({ active }) => {
+    setActiveId(active.id);
+  };
+
+  const handleDragOver = ({ over }) => {
+    setOverId(over ? resolveTargetColumn(over.id) : null);
+  };
+
+  const handleDragEnd = async ({ active, over }) => {
     setActiveId(null);
-    
-    if (!over) return;
-    
-    const activeTask = tasks.find(t => t.id === active.id);
-    const overTask = tasks.find(t => t.id === over.id);
-    
-    if (!activeTask) return;
-    
-    const activeColumn = activeTask.column_name;
-    const overColumn = overTask ? overTask.column_name : COLUMNS.find(c => c.id === over.id)?.id;
-    
-    if (!overColumn) return;
+    setOverId(null);
 
-    let newPosition = activeTask.position;
-    if (overTask && overTask.id !== activeTask.id) {
-      newPosition = overTask.position;
-    } else if (activeColumn !== overColumn) {
-      newPosition = 1;
+    if (!over) return;
+
+    const activeTask = tasks.find(t => t.id === active.id);
+    if (!activeTask) return;
+
+    const targetColumn = resolveTargetColumn(over.id);
+    if (!targetColumn) return;
+
+    // Nothing changed
+    if (active.id === over.id && activeTask.column_name === targetColumn) return;
+
+    // Optimistic update
+    const previousTasks = tasks;
+    if (setTasks) {
+      setTasks(prev =>
+        prev.map(t => t.id === activeTask.id ? { ...t, column_name: targetColumn } : t)
+      );
     }
 
-    if (activeColumn !== overColumn || (overTask && activeTask.id !== overTask.id)) {
-      try {
-        await updateTask(activeTask.id, { column_name: overColumn, position: newPosition });
-        if (onTaskUpdate) onTaskUpdate();
-      } catch (err) {
-        console.error('Failed to update task position', err);
-        setToastMessage('Move failed, please try again');
-        setTimeout(() => setToastMessage(''), 3000);
-      }
+    try {
+      await updateTask(activeTask.id, { column_name: targetColumn });
+      if (onTaskUpdate) onTaskUpdate();
+    } catch (err) {
+      console.error('Failed to update task position', err);
+      if (setTasks) setTasks(previousTasks);
+      setToastMessage('Move failed, please try again');
+      setTimeout(() => setToastMessage(''), 3000);
     }
   };
 
-  const getTasksByColumn = (columnId) => {
-    return tasks.filter(t => t.column_name === columnId).sort((a, b) => a.position - b.position);
+  const handleDragCancel = () => {
+    setActiveId(null);
+    setOverId(null);
   };
 
   const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
 
+  // ── render ────────────────────────────────────────────────────────────────
+
   return (
-    <DndContext 
-      sensors={sensors} 
-      collisionDetection={closestCorners} 
+    <DndContext
+      sensors={sensors}
+      collisionDetection={rectIntersection}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
+      {/* Error toast */}
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50 pointer-events-none">
           {toastMessage}
         </div>
       )}
+
       <div className="flex gap-6 h-full overflow-x-auto pb-4">
         {COLUMNS.map(col => {
           const columnTasks = getTasksByColumn(col.id);
           return (
-            <div key={col.id} className="flex-shrink-0 w-80 bg-gray-800 rounded-lg flex flex-col shadow-lg border-l-4 border-t border-b border-r border-gray-700" style={{ borderLeftColor: col.id === 'Backlog' ? '#3b82f6' : col.id === 'In Progress' ? '#eab308' : col.id === 'Review' ? '#a855f7' : '#22c55e' }}>
-              <div className="p-4 bg-gray-800 rounded-t-lg border-b border-gray-700 sticky top-0 z-10">
-                <h2 className="font-semibold text-lg">{col.title} <span className="text-gray-400 text-sm ml-2">({columnTasks.length})</span></h2>
-              </div>
-              
-              <div className="flex-1 p-4 overflow-y-auto min-h-[200px]" id={col.id}>
-                <SortableContext items={columnTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-3">
-                    {columnTasks.map(task => (
-                      <TaskCard 
-                        key={task.id} 
-                        task={task} 
-                        dependencies={dependencies}
-                        onTaskUpdate={onTaskUpdate}
-                        onTaskDelete={onTaskDelete}
-                        onDependencyAdd={onDependencyAdd}
-                        onDependencyRemove={onDependencyRemove}
-                        isCritical={criticalPath.includes(task.id)}
-                        allTasks={tasks}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </div>
-            </div>
+            <DroppableColumn
+              key={col.id}
+              col={col}
+              taskCount={columnTasks.length}
+              isOver={activeId !== null && overId === col.id}
+            >
+              <SortableContext
+                items={columnTasks.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-3">
+                  {columnTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      dependencies={dependencies}
+                      onTaskUpdate={onTaskUpdate}
+                      onTaskDelete={onTaskDelete}
+                      onDependencyAdd={onDependencyAdd}
+                      onDependencyRemove={onDependencyRemove}
+                      isCritical={criticalPath.includes(task.id)}
+                      allTasks={tasks}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DroppableColumn>
           );
         })}
       </div>
+
+      {/* Floating drag overlay — lifted copy that follows the cursor */}
       <DragOverlay>
         {activeTask ? (
-          <div className="opacity-80 scale-105 rotate-2">
-            <TaskCard 
-              task={activeTask} 
+          <div
+            style={{
+              transform: 'scale(1.04)',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.4)',
+              opacity: 1,
+              cursor: 'grabbing',
+              borderRadius: 8,
+            }}
+          >
+            <TaskCard
+              task={activeTask}
               dependencies={dependencies}
               isCritical={criticalPath.includes(activeTask.id)}
               allTasks={tasks}
