@@ -68,7 +68,7 @@ The app automatically seeds 10 realistic tasks representing a software project l
 
 ## AI Tool Declaration
 
-Claude (claude.ai) was used for boilerplate generation, code structure guidance, and prompt iteration during development. All DAG engine logic, graph algorithms, and core business rules were written and reviewed by the developer. Groq API (llama-3.3-70b-versatile) is used within the application for AI-powered dependency suggestions as a product feature. AI-suggested dependencies are clearly labeled in the UI with a purple badge and require explicit human approval before being added to the dependency graph.
+Claude (claude.ai) was used for debugging assistance and code review during development. All DAG engine logic, graph algorithms, API design, and core business rules were independently designed and implemented by the developer. Groq API (llama-3.3-70b-versatile) is used within the application for AI-powered dependency suggestions as a product feature. AI-suggested dependencies are clearly labeled in the UI with a purple badge and require explicit human approval before being added to the dependency graph.
 
 ## Key Assumptions and Limitations
 
